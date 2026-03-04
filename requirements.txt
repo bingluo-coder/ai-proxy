@@ -1,0 +1,2 @@
+mitmproxy>=10,<12
+Flask>=3,<4

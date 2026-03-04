@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Proxy Inspector</title>
+    <meta name="description" content="High-fidelity LLM traffic inspector for capturing and visualizing AI agent communication." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg:        #0d1117;
+        --surface:   #161b22;
+        --surface-2: #1c2230;
+        --border:    #30363d;
+        --border-2:  #21262d;
+        --ink:       #e6edf3;
+        --ink-2:     #8b949e;
+        --ink-3:     #484f58;
+        --accent:    #238636;
+        --accent-glow: rgba(35,134,54,0.25);
+        --blue:      #1f6feb;
+        --purple:    #8957e5;
+        --orange:    #e3b341;
+        --red:       #da3633;
+        --red-glow:  rgba(218,54,51,0.2);
+        --teal:      #2ea5a0;
+        --mono:      'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+        --sans:      'Inter', 'Segoe UI', system-ui, sans-serif;
+        --radius:    6px;
+        --header-h:  52px;
+        --transition: 150ms ease;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: var(--sans);
+        font-size: 13px;
+        color: var(--ink);
+        background: var(--bg);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ─── TOP HEADER ─────────────────────────────────────── */
+      .header {
+        height: var(--header-h);
+        min-height: var(--header-h);
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 12px;
+        z-index: 10;
+        flex-shrink: 0;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        white-space: nowrap;
+        margin-right: 8px;
+      }
+
+      .logo-icon {
+        width: 26px;
+        height: 26px;
+        background: linear-gradient(135deg, var(--teal), var(--blue));
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .logo-sub {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--ink-2);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        display: block;
+        line-height: 1;
+      }
+
+      .header-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border);
+        flex-shrink: 0;
+      }
+
+      .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .filter-label {
+        font-size: 11px;
+        color: var(--ink-2);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      select, input[type="number"], input[type="datetime-local"] {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 12px;
+        padding: 5px 8px;
+        outline: none;
+        transition: border-color var(--transition);
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      select:focus, input:focus {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgba(31,111,235,0.15);
+      }
+
+      select { min-width: 110px; cursor: pointer; }
+      input[type="number"] { width: 72px; }
+      input[type="datetime-local"] { width: 170px; font-size: 11px; }
+
+      .header-spacer { flex: 1; }
+
+      .kpi-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 8px;
+      }
+
+      .kpi-item {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+      }
+
+      .kpi-label {
+        font-size: 10px;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+      }
+
+      .kpi-value {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--orange);
+      }
+
+      .kpi-value.error { color: var(--red); }
+      .kpi-value.ok { color: var(--accent); }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: var(--radius);
+        border: 1px solid transparent;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition);
+        white-space: nowrap;
+        outline: none;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: #2ea043;
+        border-color: #2ea043;
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border-color: var(--border);
+        color: var(--ink-2);
+      }
+
+      .btn-ghost:hover {
+        background: var(--surface-2);
+        color: var(--ink);
+        border-color: var(--ink-3);
+      }
+
+      .btn-icon {
+        font-size: 13px;
+      }
+
+      /* ─── LIVE INDICATOR ─────────────────────────────────── */
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 0 var(--accent-glow);
+        animation: pulse 2s infinite;
+        flex-shrink: 0;
+      }
+
+      @keyframes pulse {
+        0%   { box-shadow: 0 0 0 0 rgba(35,134,54,0.7); }
+        70%  { box-shadow: 0 0 0 6px rgba(35,134,54,0); }
+        100% { box-shadow: 0 0 0 0 rgba(35,134,54,0); }
+      }
+
+      /* ─── MAIN WORKSPACE ─────────────────────────────────── */
+      .workspace {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* ─── PANELS ─────────────────────────────────────────── */
+      .panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .panel:last-child { border-right: none; }
+
+      .panel-header {
+        height: 36px;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 8px;
+        border-bottom: 1px solid var(--border-2);
+        background: var(--bg);
+        flex-shrink: 0;
+      }
+
+      .panel-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-2);
+        flex: 1;
+      }
+
+      .panel-badge {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 7px;
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--ink-2);
+        transition: opacity 150ms;
+      }
+
+      /* ─── LOADING STATE ──────────────────────────────────── */
+      /* Thin indeterminate progress bar on the bottom edge of the panel header */
+      .panel-header {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .panel-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: -60%;
+        width: 40%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--blue), transparent);
+        opacity: 0;
+        transition: opacity 200ms;
+        pointer-events: none;
+      }
+
+      /* Activate the bar when the panel has .loading */
+      .panel.loading .panel-header::after {
+        opacity: 1;
+        animation: panel-progress 1.4s ease-in-out infinite;
+      }
+
+      @keyframes panel-progress {
+        0%   { left: -60%; }
+        100% { left: 120%; }
+      }
+
+      /* Badge dims + pulses while loading */
+      .panel.loading .panel-badge {
+        opacity: 0.4;
+        animation: badge-pulse 1.4s ease-in-out infinite;
+      }
+
+      @keyframes badge-pulse {
+        0%, 100% { opacity: 0.4; }
+        50%       { opacity: 0.15; }
+      }
+
+      .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+      }
+
+      /* Scrollbar styling */
+      .panel-body::-webkit-scrollbar, pre::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .panel-body::-webkit-scrollbar-track, pre::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .panel-body::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      .panel-body::-webkit-scrollbar-thumb:hover, pre::-webkit-scrollbar-thumb:hover {
+        background: var(--ink-3);
+      }
+
+      /* ─── RESIZE HANDLE ──────────────────────────────────── */
+      .resize-handle {
+        width: 4px;
+        background: var(--border);
+        cursor: col-resize;
+        flex-shrink: 0;
+        transition: background var(--transition);
+        position: relative;
+        z-index: 5;
+      }
+
+      .resize-handle:hover, .resize-handle.dragging {
+        background: var(--blue);
+      }
+
+      /* ─── SESSION PANEL ──────────────────────────────────── */
+      #sessionPanel {
+        width: 260px;
+      }
+
+      .session-item {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-2);
+        cursor: pointer;
+        transition: background var(--transition);
+        position: relative;
+      }
+
+      .session-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: transparent;
+        transition: background var(--transition);
+      }
+
+      .session-item:hover { background: var(--surface-2); }
+      .session-item:hover::before { background: var(--ink-3); }
+
+      .session-item.active { background: rgba(31,111,235,0.08); }
+      .session-item.active::before { background: var(--blue); }
+
+      .session-id {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink);
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 3px;
+      }
+
+      .session-meta {
+        font-size: 11px;
+        color: var(--ink-2);
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .session-count {
+        font-family: var(--mono);
+        color: var(--orange);
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      /* ─── TIMELINE PANEL ─────────────────────────────────── */
+      #timelinePanel {
+        width: 260px;
+        background: var(--bg);
+        border-right: 1px solid var(--border);
+      }
+
+      details {
+        border-bottom: 1px solid var(--border-2);
+      }
+
+      summary {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        font-size: 11px;
+        list-style: none;
+        user-select: none;
+        transition: background var(--transition);
+      }
+
+      summary::-webkit-details-marker { display: none; }
+
+      summary:hover { background: var(--surface); }
+
+      summary::before {
+        content: '▶';
+        font-size: 8px;
+        color: var(--ink-3);
+        transition: transform var(--transition);
+        flex-shrink: 0;
+      }
+
+      details[open] > summary::before { transform: rotate(90deg); }
+
+      .bucket-meta {
+        color: var(--ink-2);
+        font-weight: 400;
+        font-size: 10px;
+        font-family: var(--mono);
+      }
+
+      .corr-session {
+        margin: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 10px;
+        background: var(--surface);
+        transition: border-color var(--transition);
+      }
+
+      .corr-session:hover { border-color: var(--blue); }
+
+      .corr-session-meta {
+        font-size: 10px;
+        color: var(--ink-2);
+        margin-bottom: 6px;
+        font-family: var(--mono);
+        line-height: 1.5;
+      }
+
+      .corr-session-id {
+        font-size: 11px;
+        color: var(--ink);
+        font-weight: 600;
+        font-family: var(--mono);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 4px;
+      }
+
+      .flow-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+      }
+
+      .chip {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 9px;
+        font-family: var(--mono);
+        color: var(--ink-2);
+        cursor: pointer;
+        transition: all var(--transition);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100px;
+      }
+
+      .chip:hover {
+        background: rgba(31,111,235,0.15);
+        border-color: var(--blue);
+        color: var(--blue);
+      }
+
+      .btn-xs {
+        padding: 3px 8px;
+        font-size: 10px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        color: var(--ink-2);
+        cursor: pointer;
+        font-family: var(--sans);
+        font-weight: 500;
+        transition: all var(--transition);
+        margin-top: 4px;
+        display: inline-block;
+      }
+
+      .btn-xs:hover {
+        background: rgba(31,111,235,0.15);
+        border-color: var(--blue);
+        color: var(--blue);
+      }
+
+      /* ─── FLOWS PANEL ────────────────────────────────────── */
+      #flowPanel {
+        flex: 1;
+      }
+
+      .flow-item {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border-2);
+        cursor: pointer;
+        transition: background var(--transition);
+        position: relative;
+      }
+
+      .flow-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: transparent;
+        transition: background var(--transition);
+      }
+
+      .flow-item:hover { background: var(--surface-2); }
+      .flow-item.active { background: rgba(31,111,235,0.08); }
+      .flow-item.active::before { background: var(--blue); }
+
+      .flow-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+        min-width: 0;
+      }
+
+      .flow-url {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .flow-bottom {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        color: var(--ink-2);
+        font-family: var(--mono);
+      }
+
+      .flow-time { flex-shrink: 0; }
+
+      /* ─── STATUS / PROVIDER PILL ─────────────────────────── */
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-family: var(--mono);
+        font-weight: 600;
+        white-space: nowrap;
+        flex-shrink: 0;
+        letter-spacing: 0.02em;
+      }
+
+      .pill-method {
+        background: rgba(31,111,235,0.15);
+        color: #58a6ff;
+      }
+
+      .pill-provider {
+        background: rgba(137,87,229,0.15);
+        color: #bc8cff;
+      }
+
+      .pill-status-ok {
+        background: rgba(35,134,54,0.15);
+        color: #3fb950;
+      }
+
+      .pill-status-err {
+        background: rgba(218,54,51,0.15);
+        color: #f85149;
+      }
+
+      .pill-status-neutral {
+        background: var(--surface-2);
+        color: var(--ink-2);
+      }
+
+      /* ─── INSPECTOR PANEL ────────────────────────────────── */
+      #inspectorPanel {
+        width: 520px;
+        background: var(--bg);
+        border-left: 1px solid var(--border);
+        border-right: none;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .tab-bar {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        flex-shrink: 0;
+        height: 36px;
+        align-items: flex-end;
+      }
+
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 16px;
+        height: 36px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all var(--transition);
+        white-space: nowrap;
+        user-select: none;
+      }
+
+      .tab:hover { color: var(--ink); }
+      .tab.active {
+        color: var(--ink);
+        border-bottom-color: var(--blue);
+      }
+
+      .tab-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .tab-dot-req { background: var(--blue); }
+      .tab-dot-res { background: var(--teal); }
+      .tab-dot-split { background: var(--purple); }
+
+      .inspector-pane {
+        flex: 1;
+        display: none;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .inspector-pane.active {
+        display: flex;
+      }
+
+      /* Split view: 2-col CSS grid so rows align across left and right */
+      .inspector-split {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto 1fr;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Every zone in the grid gets a bottom border except payload row */
+      .sz {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Left-column zones get a right border as the divider */
+      .sz-left {
+        border-right: 1px solid var(--border);
+      }
+
+      /* The payload zones expand to fill remaining height */
+      .sz-pay {
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Structured section inside each inspector pane/half */
+      .insp-section {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .insp-section-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 5px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border-2);
+        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+
+      /* Meta row: URL + method + status */
+      .insp-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-2);
+        flex-shrink: 0;
+        background: rgba(0,0,0,0.15);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .insp-url {
+        color: var(--ink);
+        word-break: break-all;
+        flex: 1;
+        min-width: 0;
+        font-size: 11px;
+      }
+
+      /* Headers table */
+      .insp-headers {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-2);
+        flex-shrink: 0;
+        max-height: 180px;
+        overflow-y: auto;
+      }
+
+      .header-row {
+        display: grid;
+        gap: 4px 10px;
+        align-items: baseline;
+        padding: 2px 0;
+        border-bottom: 1px solid var(--border-2);
+      }
+
+      .header-row:last-child { border-bottom: none; }
+
+      .hdr-key {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: #79c0ff;
+        word-break: break-all;
+        font-weight: 500;
+      }
+
+      .hdr-val {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--ink-2);
+        word-break: break-all;
+      }
+
+      /* Payload / body */
+      .insp-payload {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      pre {
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.65;
+        padding: 14px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow: auto;
+        flex: 1;
+        color: #c9d1d9;
+        background: transparent;
+        margin: 0;
+        min-height: 0;
+      }
+
+      .split-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--border-2);
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 24px;
+        color: var(--ink-3);
+        font-size: 12px;
+        text-align: center;
+        font-family: var(--mono);
+        user-select: none;
+      }
+
+      .empty-icon {
+        font-size: 32px;
+        display: block;
+        margin-bottom: 12px;
+        opacity: 0.4;
+      }
+
+      /* ─── MISCELLANEOUS ──────────────────────────────────── */
+      .no-data {
+        padding: 20px 12px;
+        color: var(--ink-3);
+        font-size: 12px;
+        font-family: var(--mono);
+        text-align: center;
+      }
+
+      .section-subheader {
+        padding: 4px 12px;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border-bottom: 1px solid var(--border-2);
+        background: var(--bg);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+
+      .chars-label {
+        color: var(--orange);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      .model-label {
+        color: var(--teal);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      /* Highlight JSON keys */
+      .json-key   { color: #79c0ff; }
+      .json-str   { color: #a5d6ff; }
+      .json-num   { color: #79c0ff; }
+      .json-bool  { color: #ff7b72; }
+      .json-null  { color: #ff7b72; }
+
+      /* ─── SESSION DELETE BUTTON ──────────────────────────────── */
+      .session-del-btn {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+        color: var(--ink-3);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity var(--transition), color var(--transition), background var(--transition);
+        flex-shrink: 0;
+        padding: 0;
+        outline: none;
+      }
+
+      .session-item:hover .session-del-btn {
+        opacity: 1;
+      }
+
+      .session-del-btn:hover {
+        color: var(--red);
+        background: var(--red-glow);
+      }
+
+      .session-del-btn svg {
+        width: 13px;
+        height: 13px;
+        pointer-events: none;
+      }
+
+      /* ─── CONFIRM MODAL ──────────────────────────────────────── */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.65);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+      }
+
+      .modal-overlay.visible {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      .modal-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 24px;
+        width: 340px;
+        max-width: calc(100vw - 32px);
+        box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+        transform: translateY(12px) scale(0.97);
+        transition: transform 180ms ease;
+      }
+
+      .modal-overlay.visible .modal-box {
+        transform: translateY(0) scale(1);
+      }
+
+      .modal-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--red-glow);
+        border: 1px solid rgba(218,54,51,0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        color: var(--red);
+      }
+
+      .modal-icon svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .modal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 8px;
+        letter-spacing: -0.01em;
+      }
+
+      .modal-body {
+        font-size: 12px;
+        color: var(--ink-2);
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+
+      .modal-body code {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        word-break: break-all;
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .btn-danger {
+        background: var(--red);
+        border-color: var(--red);
+        color: #fff;
+      }
+
+      .btn-danger:hover {
+        background: #f85149;
+        border-color: #f85149;
+        box-shadow: 0 0 0 3px var(--red-glow);
+      }
+
+      /* ─── RESPONSIVE ─────────────────────────────────────────── */
+      @media (max-width: 1200px) {
+        #timelinePanel { display: none; }
+        .resize-handle { display: none; }
+      }
+
+      @media (max-width: 900px) {
+        #sessionPanel { display: none; }
+        #inspectorPanel { width: 380px; }
+        .filter-group:nth-child(n+4) { display: none; }
+        input[type="datetime-local"] { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- ═══ TOP HEADER BAR ══════════════════════════════════════ -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🔬</div>
+        <div>
+          AI Proxy
+          <span class="logo-sub">Inspector</span>
+        </div>
+      </div>
+
+      <div class="header-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Provider</span>
+        <select id="providerFilter">
+          <option value="all">All Providers</option>
+          <option value="openai">OpenAI</option>
+          <option value="openai_compatible">OpenAI Compatible</option>
+          <option value="azure_openai">Azure OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="gemini">Gemini</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Session</span>
+        <select id="sessionFilter">
+          <option value="all">All Sessions</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">From</span>
+        <input id="fromInput" type="datetime-local" />
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">To</span>
+        <input id="toInput" type="datetime-local" />
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Limit</span>
+        <input id="limitInput" type="number" min="1" max="5000" value="300" />
+      </div>
+
+      <div class="header-spacer"></div>
+
+      <div class="kpi-bar">
+        <div class="kpi-item">
+          <span class="kpi-label">Flows</span>
+          <span class="kpi-value ok" id="kpiFlows">0</span>
+        </div>
+        <div class="kpi-item">
+          <span class="kpi-label">Est. Chars</span>
+          <span class="kpi-value" id="kpiChars">0</span>
+        </div>
+        <div class="kpi-item">
+          <span class="kpi-label">Errors</span>
+          <span class="kpi-value error" id="kpiErrors">0</span>
+        </div>
+      </div>
+
+      <div class="header-divider"></div>
+
+      <div class="live-dot" title="Auto-refresh every 10 seconds"></div>
+
+      <button id="refreshBtn" class="btn btn-primary">⟳ Refresh</button>
+      <button id="exportJsonBtn" class="btn btn-ghost">↓ JSON</button>
+      <button id="exportCsvBtn" class="btn btn-ghost">↓ CSV</button>
+    </header>
+
+    <!-- ═══ MAIN WORKSPACE ══════════════════════════════════════ -->
+    <div class="workspace">
+
+      <!-- Column 1: Sessions -->
+      <div class="panel" id="sessionPanel">
+        <div class="panel-header">
+          <span class="panel-title">Sessions</span>
+          <span class="panel-badge" id="sessionCount">0</span>
+        </div>
+        <div class="panel-body" id="sessionList">
+          <div class="no-data">No sessions yet</div>
+        </div>
+      </div>
+
+      <div class="resize-handle" id="rh1"></div>
+
+      <!-- Column 2: Timeline -->
+      <div class="panel" id="timelinePanel">
+        <div class="panel-header">
+          <span class="panel-title">Timeline</span>
+        </div>
+        <div class="panel-body" id="timelineSessionList">
+          <div class="no-data">No timeline data</div>
+        </div>
+      </div>
+
+      <div class="resize-handle" id="rh2"></div>
+
+      <!-- Column 3: Flows -->
+      <div class="panel" id="flowPanel">
+        <div class="panel-header">
+          <span class="panel-title">Flows</span>
+          <span class="panel-badge" id="flowCount">0</span>
+        </div>
+        <div class="panel-body" id="flowList">
+          <div class="no-data">No flows captured yet</div>
+        </div>
+      </div>
+
+      <div class="resize-handle" id="rh3"></div>
+
+      <!-- Column 4: Inspector -->
+      <div id="inspectorPanel">
+        <div class="tab-bar">
+          <div class="tab active" id="tabSplit" onclick="switchTab('split')">
+            <span class="tab-dot tab-dot-split"></span> Split
+          </div>
+          <div class="tab" id="tabReq" onclick="switchTab('req')">
+            <span class="tab-dot tab-dot-req"></span> Request
+          </div>
+          <div class="tab" id="tabRes" onclick="switchTab('res')">
+            <span class="tab-dot tab-dot-res"></span> Response
+          </div>
+        </div>
+
+        <!-- Empty state (no flow selected) -->
+        <div class="inspector-pane active" id="paneEmpty">
+          <div class="empty-state">
+            <span class="empty-icon">🔍</span>
+            Select a flow to inspect
+          </div>
+        </div>
+
+        <!-- Split view pane: 4 rows × 2 cols grid -->
+        <div class="inspector-pane" id="panesSplit">
+          <div class="inspector-split">
+            <!-- Row 1: meta -->
+            <div class="sz sz-left" id="szReqMeta"></div>
+            <div class="sz"         id="szResMeta"></div>
+            <!-- Row 2: headers label -->
+            <div class="sz sz-left insp-section-label" id="szReqHdrLbl"></div>
+            <div class="sz         insp-section-label" id="szResHdrLbl"></div>
+            <!-- Row 3: headers body (scrollable) -->
+            <div class="sz sz-left insp-headers" id="szReqHdr"></div>
+            <div class="sz         insp-headers" id="szResHdr"></div>
+            <!-- Row 4: payload (fills remaining space) -->
+            <div class="sz sz-left sz-pay" id="szReqPay"></div>
+            <div class="sz         sz-pay" id="szResPay"></div>
+          </div>
+        </div>
+
+        <!-- Request-only pane -->
+        <div class="inspector-pane" id="panesReq">
+          <div class="insp-section" id="fullReq"></div>
+        </div>
+
+        <!-- Response-only pane -->
+        <div class="inspector-pane" id="panesRes">
+          <div class="insp-section" id="fullRes"></div>
+        </div>
+      </div>
+
+    </div><!-- end .workspace -->
+
+    <!-- ═══ CONFIRM DELETE MODAL ════════════════════════════════ -->
+    <div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-box">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+            <path d="M9 6V4h6v2"></path>
+          </svg>
+        </div>
+        <div class="modal-title" id="modalTitle">Delete Session?</div>
+        <div class="modal-body" id="modalBody">This will permanently delete all flows in this session.</div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="modalCancelBtn">Cancel</button>
+          <button class="btn btn-danger" id="modalConfirmBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ── State ───────────────────────────────────────────── */
+      const state = {
+        flows: [],
+        sessions: [],
+        timelineSessions: [],
+        selectedFlow: null,
+        currentTab: 'split',
+        reqData: null,   // { url, method, headers, body }
+        resData: null,   // { status, reason, headers, body }
+      };
+
+      /* ── DOM refs ────────────────────────────────────────── */
+      const el = {
+        providerFilter:        document.getElementById('providerFilter'),
+        sessionFilter:         document.getElementById('sessionFilter'),
+        fromInput:             document.getElementById('fromInput'),
+        toInput:               document.getElementById('toInput'),
+        limitInput:            document.getElementById('limitInput'),
+        refreshBtn:            document.getElementById('refreshBtn'),
+        exportJsonBtn:         document.getElementById('exportJsonBtn'),
+        exportCsvBtn:          document.getElementById('exportCsvBtn'),
+        flowList:              document.getElementById('flowList'),
+        sessionList:           document.getElementById('sessionList'),
+        timelineSessionList:   document.getElementById('timelineSessionList'),
+        kpiFlows:              document.getElementById('kpiFlows'),
+        kpiChars:              document.getElementById('kpiChars'),
+        kpiErrors:             document.getElementById('kpiErrors'),
+        sessionCount:          document.getElementById('sessionCount'),
+        flowCount:             document.getElementById('flowCount'),
+      };
+
+      /* ── Helpers ─────────────────────────────────────────── */
+      function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func(...args), wait);
+        };
+      }
+
+      function fmt(n) { return new Intl.NumberFormat().format(n || 0); }
+
+      function toPretty(obj) {
+        if (!obj) return '(empty)';
+        if (typeof obj === 'string') return obj;
+        return JSON.stringify(obj, null, 2);
+      }
+
+      function shortId(id) {
+        if (!id || id === 'none') return 'none';
+        return id.length > 28 ? id.slice(0, 26) + '…' : id;
+      }
+
+      function shortUrl(url) {
+        try { return new URL(url).pathname + new URL(url).search; } catch (_) { return url || ''; }
+      }
+
+      function statusPillClass(s) {
+        const n = Number(s);
+        if (!s || s === '-') return 'pill-status-neutral';
+        if (n >= 400) return 'pill-status-err';
+        return 'pill-status-ok';
+      }
+
+      function buildCommonParams() {
+        const p = new URLSearchParams({
+          provider:   el.providerFilter.value,
+          session_id: el.sessionFilter.value,
+        });
+        if (el.fromInput.value) p.set('from', el.fromInput.value);
+        if (el.toInput.value)   p.set('to',   el.toInput.value);
+        return p;
+      }
+
+      async function fetchJson(url) {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`${r.status}: ${url}`);
+        return r.json();
+      }
+
+      /* ── Inspector rendering ─────────────────────────────── */
+
+      // Returns { meta, hdrRows, hasHeaders, payload } strings for one side
+      function buildInspectorParts(data, side) {
+        if (!data) return { meta: '', hdrRows: '', hasHeaders: false, payload: '' };
+
+        // Meta
+        let meta = '';
+        if (side === 'req') {
+          meta = `<div class="insp-meta"><span class="pill pill-method">${esc(data.method || '?')}</span><span class="insp-url" title="${esc(data.url)}">${esc(data.url)}</span></div>`;
+        } else {
+          const sc = data.status || '';
+          const cls = Number(sc) >= 400 ? 'pill-status-err' : 'pill-status-ok';
+          meta = `<div class="insp-meta"><span class="pill ${cls}">${esc(sc)} ${esc(data.reason || '')}</span></div>`;
+        }
+
+        // Headers rows
+        let hdrRows = '';
+        const hasHeaders = !!(data.headers && Object.keys(data.headers).length);
+        if (hasHeaders) {
+          for (const [k, v] of Object.entries(data.headers)) {
+            hdrRows += `<div class="header-row"><span class="hdr-key">${esc(k)}</span><span class="hdr-val">${esc(v)}</span></div>`;
+          }
+        }
+
+        // Payload
+        const payload = `<div class="insp-section-label">Payload</div><pre>${esc(toPretty(data.body))}</pre>`;
+
+        return { meta, hdrRows, hasHeaders, payload };
+      }
+
+      // Build full single-column HTML (for Request / Response full-pane views)
+      function buildInspectorHTML(data, side) {
+        if (!data) return '';
+        const p = buildInspectorParts(data, side);
+        let html = p.meta;
+        if (p.hasHeaders) {
+          html += `<div class="insp-section-label">Headers</div><div class="insp-headers">${p.hdrRows}</div>`;
+        }
+        html += `<div class="insp-section-label">Payload</div><div class="insp-payload"><pre>${esc(toPretty(data.body))}</pre></div>`;
+        return html;
+      }
+
+      function esc(str) {
+        if (str == null) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      /* ── Tab switching ───────────────────────────────────── */
+      function switchTab(name) {
+        state.currentTab = name;
+        // map tab name -> element IDs
+        const tabs  = { split: 'tabSplit', req: 'tabReq',     res: 'tabRes' };
+        const panes = { split: 'panesSplit', req: 'panesReq', res: 'panesRes' };
+        Object.keys(tabs).forEach(t => {
+          document.getElementById(tabs[t]).classList.toggle('active', t === name);
+        });
+        Object.keys(panes).forEach(t => {
+          document.getElementById(panes[t]).classList.toggle('active', t === name);
+        });
+        document.getElementById('paneEmpty').classList.remove('active');
+        updateInspectorViews();
+      }
+
+      function updateInspectorViews() {
+        if (!state.reqData && !state.resData) {
+          // Show empty state, hide all content panes
+          document.getElementById('paneEmpty').classList.add('active');
+          ['panesSplit','panesReq','panesRes'].forEach(id => {
+            document.getElementById(id).classList.remove('active');
+          });
+          return;
+        }
+
+        const rq = buildInspectorParts(state.reqData, 'req');
+        const rs = buildInspectorParts(state.resData, 'res');
+
+        // ── Split pane: populate shared-row grid zones
+        document.getElementById('szReqMeta').innerHTML    = rq.meta;
+        document.getElementById('szResMeta').innerHTML    = rs.meta;
+        // Show header label row only if at least one side has headers
+        const eitherHasHdrs = rq.hasHeaders || rs.hasHeaders;
+        document.getElementById('szReqHdrLbl').textContent = eitherHasHdrs ? 'Headers' : '';
+        document.getElementById('szResHdrLbl').textContent = eitherHasHdrs ? 'Headers' : '';
+        // Hide the header row entirely when neither side has headers
+        const hdrRowStyle = eitherHasHdrs ? '' : 'none';
+        document.getElementById('szReqHdrLbl').style.display = hdrRowStyle;
+        document.getElementById('szResHdrLbl').style.display = hdrRowStyle;
+        document.getElementById('szReqHdr').style.display    = hdrRowStyle;
+        document.getElementById('szResHdr').style.display    = hdrRowStyle;
+        document.getElementById('szReqHdr').innerHTML = rq.hdrRows;
+        document.getElementById('szResHdr').innerHTML = rs.hdrRows;
+        // Payload zones
+        document.getElementById('szReqPay').innerHTML = rq.payload;
+        document.getElementById('szResPay').innerHTML = rs.payload;
+
+        // ── Full panes (single-column)
+        document.getElementById('fullReq').innerHTML = buildInspectorHTML(state.reqData, 'req');
+        document.getElementById('fullRes').innerHTML = buildInspectorHTML(state.resData, 'res');
+      }
+
+      /* ── Rendering ───────────────────────────────────────── */
+      function renderSessions() {
+        el.sessionList.innerHTML = '';
+        el.sessionCount.textContent = state.sessions.length;
+
+        if (!state.sessions.length) {
+          el.sessionList.innerHTML = '<div class="no-data">No sessions found</div>';
+          return;
+        }
+        for (const s of state.sessions) {
+          const sid = s.session_id || 'none';
+          const div = document.createElement('div');
+          div.className = `session-item${el.sessionFilter.value === sid ? ' active' : ''}`;
+          div.innerHTML = `
+            <div class="session-id" style="padding-right:28px">${shortId(sid)}</div>
+            <div class="session-meta">
+              <span><span class="session-count">${s.count}</span> flows</span>
+              <span class="chars-label">${fmt(s.total_input_chars_estimate)} ch</span>
+            </div>
+            <div class="session-meta" style="opacity:0.7; margin-top:2px;">${(s.last_timestamp || '').replace('T',' ').slice(0,16)}</div>
+            <button class="session-del-btn" title="Delete session" aria-label="Delete session ${esc(sid)}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                <path d="M9 6V4h6v2"></path>
+              </svg>
+            </button>
+          `;
+          div.onclick = () => {
+            document.querySelectorAll('.session-item').forEach(x => x.classList.remove('active'));
+            div.classList.add('active');
+            setSessionFilter(sid);
+            debouncedRefreshFiltered();
+          };
+          // Delete button — stop click from bubbling to session selector
+          div.querySelector('.session-del-btn').onclick = (e) => {
+            e.stopPropagation();
+            openDeleteModal(sid, s.count);
+          };
+          el.sessionList.appendChild(div);
+        }
+      }
+
+      function renderTimelineSessions() {
+        el.timelineSessionList.innerHTML = '';
+        if (!state.timelineSessions.length) {
+          el.timelineSessionList.innerHTML = '<div class="no-data">No timeline data</div>';
+          return;
+        }
+        state.timelineSessions.forEach((bucket, i) => {
+          const details = document.createElement('details');
+          if (i === 0) details.open = true;
+
+          const summary = document.createElement('summary');
+          summary.innerHTML = `<span style="flex:1">${bucket.bucket}</span><span class="bucket-meta">${bucket.count}f · ${bucket.session_count}s</span>`;
+          details.appendChild(summary);
+
+          (bucket.sessions || []).forEach(session => {
+            const w = document.createElement('div');
+            w.className = 'corr-session';
+            w.innerHTML = `
+              <div class="corr-session-id">${shortId(session.session_id || 'none')}</div>
+              <div class="corr-session-meta">${session.count} flows · ${fmt(session.input_chars_estimate)} chars<br>${(session.last_timestamp||'?').replace('T',' ').slice(0,16)}</div>
+            `;
+
+            const btn = document.createElement('span');
+            btn.className = 'btn-xs';
+            btn.textContent = 'Filter';
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              setSessionFilter(session.session_id || 'none');
+              renderSessions();
+              debouncedRefreshFiltered();
+            };
+            w.appendChild(btn);
+
+            const chips = document.createElement('div');
+            chips.className = 'flow-chips';
+            (session.flow_ids || []).slice(0, 8).forEach(fid => {
+              const c = document.createElement('span');
+              c.className = 'chip';
+              c.title = fid;
+              c.textContent = fid.slice(0, 8) + '…';
+              c.onclick = async (e) => {
+                e.stopPropagation();
+                if (!state.flows.some(f => f.flow_id === fid)) {
+                  el.sessionFilter.value = 'all';
+                  await refreshFlows();
+                }
+                await selectFlow(fid);
+              };
+              chips.appendChild(c);
+            });
+            w.appendChild(chips);
+            details.appendChild(w);
+          });
+
+          el.timelineSessionList.appendChild(details);
+        });
+      }
+
+      function renderFlows() {
+        el.flowList.innerHTML = '';
+        let totalChars = 0, errors = 0;
+
+        for (const flow of state.flows) {
+          totalChars += flow.input_chars_estimate || 0;
+          const status = flow.response_status || '-';
+          if (Number(status) >= 400) errors++;
+
+          const div = document.createElement('div');
+          div.className = `flow-item${state.selectedFlow === flow.flow_id ? ' active' : ''}`;
+
+          const url = flow.url || flow.path || '';
+          const patched = shortUrl(url);
+
+          div.innerHTML = `
+            <div class="flow-top">
+              <span class="pill pill-method">${flow.method || '?'}</span>
+              <span class="pill ${statusPillClass(status)}">${status}</span>
+              <span class="pill pill-provider">${flow.provider || 'unknown'}</span>
+              <span class="flow-url" title="${url}">${patched}</span>
+            </div>
+            <div class="flow-bottom">
+              <span class="flow-time">${(flow.timestamp || '').replace('T',' ').slice(0,19)}</span>
+              <span class="model-label">${flow.model || ''}</span>
+              <span class="chars-label">${fmt(flow.input_chars_estimate)}ch</span>
+            </div>
+          `;
+          div.onclick = () => selectFlow(flow.flow_id);
+          el.flowList.appendChild(div);
+        }
+
+        el.kpiFlows.textContent  = fmt(state.flows.length);
+        el.flowCount.textContent = state.flows.length;
+        el.kpiChars.textContent  = fmt(totalChars);
+        el.kpiErrors.textContent = fmt(errors);
+      }
+
+      async function selectFlow(flowId) {
+        state.selectedFlow = flowId;
+        renderFlows();
+
+        try {
+          const detail = await fetchJson(`/api/flows/${encodeURIComponent(flowId)}`);
+
+          // Build structured request data
+          if (detail.request) {
+            state.reqData = {
+              method:  detail.request.method || '?',
+              url:     detail.request.url || detail.request.path || '',
+              headers: detail.request.headers || {},
+              body:    detail.request_json || detail.request.body || null,
+            };
+          } else {
+            state.reqData = null;
+          }
+
+          // Build structured response data
+          if (detail.response) {
+            state.resData = {
+              status:  detail.response.status_code || '',
+              reason:  detail.response.reason || '',
+              headers: detail.response.headers || {},
+              body:    detail.response_json || detail.response.body
+                        || { message: 'No response body captured' },
+            };
+          } else {
+            state.resData = { status: '', reason: '', headers: {},
+              body: { message: 'No response captured' } };
+          }
+
+          // Switch out of empty state if we were there
+          if (state.currentTab === 'empty') state.currentTab = 'split';
+          switchTab(state.currentTab);
+
+        } catch (err) {
+          state.reqData = { method: 'ERR', url: flowId, headers: {},
+            body: `Failed to load flow: ${err.message}` };
+          state.resData = null;
+          switchTab(state.currentTab);
+        }
+      }
+
+      /* ── Data fetching ───────────────────────────────────── */
+      function setSessionFilter(sid) {
+        const norm = sid || 'none';
+        if (![...el.sessionFilter.options].some(o => o.value === norm)) {
+          const opt = document.createElement('option');
+          opt.value = norm;
+          opt.textContent = `${norm} (ad hoc)`;
+          el.sessionFilter.appendChild(opt);
+        }
+        el.sessionFilter.value = norm;
+      }
+
+      const debouncedRefreshFiltered = debounce(async () => {
+        await Promise.all([refreshFlows(), refreshTimelineSessions()]);
+      }, 300);
+
+      /* ── Loading helpers ──────────────────────────────────── */
+      function setLoading(panelId, on) {
+        document.getElementById(panelId).classList.toggle('loading', on);
+      }
+
+      async function refreshSessions() {
+        setLoading('sessionPanel', true);
+        try {
+          const p = buildCommonParams();
+          p.set('session_id', 'all');
+          const data = await fetchJson(`/api/sessions?${p}`);
+          state.sessions = data.sessions || [];
+
+          const current = el.sessionFilter.value;
+          el.sessionFilter.innerHTML = '<option value="all">All Sessions</option>';
+          for (const s of state.sessions) {
+            const opt = document.createElement('option');
+            opt.value = s.session_id;
+            opt.textContent = `${shortId(s.session_id)} (${s.count})`;
+            el.sessionFilter.appendChild(opt);
+          }
+          if ([...el.sessionFilter.options].some(o => o.value === current)) {
+            el.sessionFilter.value = current;
+          }
+          renderSessions();
+        } finally {
+          setLoading('sessionPanel', false);
+        }
+      }
+
+      async function refreshTimelineSessions() {
+        setLoading('timelinePanel', true);
+        try {
+          const data = await fetchJson(`/api/timeline_sessions?${buildCommonParams()}`);
+          state.timelineSessions = data.timeline_sessions || [];
+          renderTimelineSessions();
+        } finally {
+          setLoading('timelinePanel', false);
+        }
+      }
+
+      async function refreshFlows() {
+        setLoading('flowPanel', true);
+        try {
+          const p = buildCommonParams();
+          p.set('limit', el.limitInput.value);
+          const data = await fetchJson(`/api/flows?${p}`);
+          state.flows = data.flows || [];
+
+          if (state.selectedFlow && !state.flows.some(f => f.flow_id === state.selectedFlow)) {
+            state.selectedFlow = null;
+            state.reqData = null;
+            state.resData = null;
+            updateInspectorViews();
+          }
+          renderFlows();
+        } finally {
+          setLoading('flowPanel', false);
+        }
+      }
+
+      function exportData(fmt) {
+        const p = buildCommonParams();
+        p.set('format', fmt);
+        if (fmt === 'json') p.set('include_details', '1');
+        window.location.href = `/api/export?${p}`;
+      }
+
+      let _isFirstLoad = true;
+      async function refreshAll() {
+        try {
+          await refreshSessions();
+          
+          if (_isFirstLoad && state.sessions.length > 0) {
+            _isFirstLoad = false;
+            const firstSid = state.sessions[0].session_id || 'none';
+            if (el.sessionFilter.value === 'all') {
+              setSessionFilter(firstSid);
+              renderSessions(); // Ensure it visually shows as clicked
+            }
+          }
+
+          await Promise.all([refreshTimelineSessions(), refreshFlows()]);
+        } catch (err) {
+          state.reqText = `Refresh failed: ${err.message}`;
+          state.resText = '';
+          updateInspectorViews();
+        }
+      }
+
+      /* ── Resizable columns ───────────────────────────────── */
+      function makeResizable(handleId, leftPanelId, rightPanelId) {
+        const handle = document.getElementById(handleId);
+        const leftPanel = document.getElementById(leftPanelId);
+        const rightPanel = document.getElementById(rightPanelId);
+
+        if (!handle || !leftPanel || !rightPanel) return;
+
+        let dragging = false, startX = 0, startLeftW = 0, startRightW = 0;
+
+        handle.addEventListener('mousedown', e => {
+          dragging = true;
+          startX = e.clientX;
+          startLeftW  = leftPanel.getBoundingClientRect().width;
+          startRightW = rightPanel.getBoundingClientRect().width;
+          handle.classList.add('dragging');
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+          e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', e => {
+          if (!dragging) return;
+          const dx = e.clientX - startX;
+          const newL = Math.max(160, startLeftW + dx);
+          const newR = Math.max(160, startRightW - dx);
+          leftPanel.style.width  = `${newL}px`;
+          rightPanel.style.width = `${newR}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+          if (!dragging) return;
+          dragging = false;
+          handle.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        });
+      }
+
+      makeResizable('rh1', 'sessionPanel',  'timelinePanel');
+      makeResizable('rh2', 'timelinePanel', 'flowPanel');
+      makeResizable('rh3', 'flowPanel',     'inspectorPanel');
+
+      /* ── Inspector resize (vertical handle between split halves) is native flex */
+
+      /* ── Delete session modal ────────────────────────────────── */
+      const confirmModal   = document.getElementById('confirmModal');
+      const modalBody      = document.getElementById('modalBody');
+      const modalCancelBtn = document.getElementById('modalCancelBtn');
+      const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+
+      let _pendingDeleteSid = null;
+
+      function openDeleteModal(sid, count) {
+        _pendingDeleteSid = sid;
+        modalBody.innerHTML = `Delete <strong>${count}</strong> flow${count !== 1 ? 's' : ''} in session <code>${esc(sid)}</code>?<br><br>This action <strong>cannot be undone</strong>.`;
+        confirmModal.classList.add('visible');
+        modalConfirmBtn.focus();
+      }
+
+      function closeDeleteModal() {
+        confirmModal.classList.remove('visible');
+        _pendingDeleteSid = null;
+      }
+
+      modalCancelBtn.onclick = closeDeleteModal;
+
+      // Close when clicking the backdrop (outside the box)
+      confirmModal.addEventListener('click', (e) => {
+        if (e.target === confirmModal) closeDeleteModal();
+      });
+
+      // Close on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && confirmModal.classList.contains('visible')) closeDeleteModal();
+      });
+
+      modalConfirmBtn.onclick = async () => {
+        const sid = _pendingDeleteSid;
+        if (!sid) return;
+        closeDeleteModal();
+        try {
+          const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
+          if (!res.ok && res.status !== 207) throw new Error(`${res.status}`);
+          // If the deleted session was selected, reset the filter
+          if (el.sessionFilter.value === sid) {
+            el.sessionFilter.value = 'all';
+            state.selectedFlow = null;
+            state.reqData = null;
+            state.resData = null;
+            updateInspectorViews();
+          }
+          await refreshAll();
+        } catch (err) {
+          console.error('Delete session failed:', err);
+        }
+      };
+
+      /* ── Event wiring ────────────────────────────────────────── */
+      const debouncedRefreshAll = debounce(refreshAll, 300);
+
+      el.refreshBtn.onclick      = debouncedRefreshAll;
+      el.providerFilter.onchange = debouncedRefreshAll;
+      el.sessionFilter.onchange  = () => {
+        renderSessions();
+        debouncedRefreshFiltered();
+      };
+      el.fromInput.onchange      = debouncedRefreshAll;
+      el.toInput.onchange        = debouncedRefreshAll;
+      el.exportJsonBtn.onclick = () => exportData('json');
+      el.exportCsvBtn.onclick  = () => exportData('csv');
+
+      refreshAll();
+      setInterval(refreshAll, 10000);
+    </script>
+  </body>
+</html>
